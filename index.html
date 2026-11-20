@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Atelier Formation — Générateur de vidéos pédagogiques</title>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root {
+        --bg: #fafafa; --panel: #ffffff; --panel-2: #f5f5f5; --border: #e5e5e5;
+        --ink: #1a1a1a; --ink-dim: #777; --ink-faint: #aaa;
+        --success: #2d8a4e; --error: #c0392b; --warn: #d4a017; --info: #4a6cf7;
+        --radius: 12px;
+    }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background: var(--bg); color: var(--ink); min-height: 100vh;
+        padding: 1.5rem 1rem 6rem; font-size: 15px; line-height: 1.5;
+        max-width: 900px; margin: 0 auto;
+    }
+    header { margin-bottom: 1.5rem; text-align: center; }
+    h1 { font-size: 1.4rem; font-weight: 500; letter-spacing: -0.02em; margin-bottom: 0.3rem; }
+    .subtitle { font-size: 0.8rem; color: var(--ink-dim); font-style: italic; }
+
+    .toast {
+        position: fixed; top: 1.5rem; left: 50%;
+        transform: translateX(-50%) translateY(-100px);
+        background: var(--ink); color: #fff;
+        padding: 0.85rem 1.4rem; border-radius: 10px;
+        font-size: 0.85rem; font-weight: 500;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        z-index: 1000; opacity: 0;
+        transition: transform 0.35s ease, opacity 0.35s ease;
+        max-width: 90vw; text-align: center;
+        display: flex; align-items: center; gap: 0.5rem;
+    }
+    .toast.visible { transform: translateX(-50%) translateY(0); opacity: 1; }
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--error); }
+    .toast.warn { background: var(--warn); }
+    .toast .toast-icon { font-size: 1rem; }
+
+    .info-banner {
+        background: #eef4ff; border-left: 3px solid var(--info);
+        padding: 0.75rem 0.95rem; border-radius: 8px;
+        font-size: 0.78rem; color: #2a3a5c;
+        margin-bottom: 1rem; line-height: 1.45;
+    }
+    .info-banner strong { color: #1a1a1a; }
+
+    .section {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: var(--radius); margin-bottom: 1rem;
+        overflow: hidden;
+    }
+    .section-header {
+        padding: 0.9rem 1.1rem; cursor: pointer; user-select: none;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .section-header:active { background: var(--panel-2); }
+    .section-title {
+        font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em;
+        color: var(--ink-dim); font-weight: 600;
+    }
+    .section-title .badge {
+        display: inline-block; margin-left: 0.4rem; padding: 0.1rem 0.4rem;
+        background: var(--ink); color: #fff; border-radius: 10px;
+        font-size: 0.65rem; letter-spacing: 0;
+    }
+    .section-title .badge.soft { background: var(--info); color: #fff; }
+    .section-header .chevron {
+        font-size: 0.7rem; color: var(--ink-faint); transition: transform 0.2s;
+    }
+    .section.open .section-header .chevron { transform: rotate(180deg); }
+    .section-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+    .section.open .section-body { max-height: 4000px; }
+    .section-content { padding: 0 1.1rem 1.1rem; }
+
+    .api-panel {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 1rem 1.2rem;
+        margin-bottom: 1rem; transition: border-color 0.3s;
+    }
+    .api-panel.ok { border-color: var(--success); }
+
+    .api-key-input {
+        width: 100%; padding: 0.85rem 1rem;
+        border-radius: 8px; border: 1px solid var(--border);
+        background: #fafafa; color: var(--ink);
+        font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+        font-size: 0.85rem; margin-bottom: 0.6rem;
+    }
+    .api-key-input:focus { outline: none; border-color: var(--ink); }
+
+    .api-save-btn {
+        width: 100%; padding: 0.8rem 1.2rem;
+        border-radius: 8px; border: none;
+        background: var(--ink); color: #fff;
+        font-size: 0.9rem; font-weight: 600; font-family: inherit;
+        cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+        margin-bottom: 0.6rem;
+    }
+    .api-save-btn:active { transform: scale(0.98); }
+
+    .api-status-line {
+        font-size: 0.75rem; padding: 0.55rem 0.85rem;
+        border-radius: 6px; margin-bottom: 0.5rem;
+        display: flex; align-items: center; gap: 0.5rem;
+        background: var(--panel-2); color: var(--ink-dim);
+        transition: all 0.3s;
+    }
+    .api-status-line.ok { background: #e3f5e9; color: var(--success); font-weight: 600; }
+    .api-status-line .status-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--ink-faint); flex-shrink: 0;
+    }
+    .api-status-line.ok .status-dot { background: var(--success); }
+
+    .api-hint { font-size: 0.72rem; color: var(--ink-dim); margin-top: 0.4rem; }
+    .api-hint a { color: var(--ink); text-decoration: underline; }
+
+    .stat-line {
+        font-size: 0.72rem; color: var(--ink-dim); margin-top: 0.5rem;
+        padding: 0.4rem 0.6rem; background: var(--panel-2); border-radius: 6px;
+        display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.3rem;
+    }
+
+    .wake-status {
+        font-size: 0.72rem; padding: 0.5rem 0.7rem;
+        border-radius: 6px; margin-top: 0.4rem;
+        display: flex; justify-content: space-between; align-items: center;
+        background: #eef4ff; color: var(--info);
+        flex-wrap: wrap; gap: 0.4rem;
+    }
+    .wake-status.active { background: #e3f5e9; color: var(--success); }
+    .wake-status.warn { background: #fdf5e3; color: var(--warn); }
+    .wake-status button {
+        background: transparent; border: 1px solid currentColor;
+        color: inherit; padding: 0.25rem 0.6rem; border-radius: 6px;
+        font-size: 0.68rem; cursor: pointer; font-family: inherit;
+    }
+
+    .upload-zone {
+        border: 2px dashed var(--border); border-radius: var(--radius);
+        padding: 2rem 1rem; text-align: center; cursor: pointer;
+        transition: border-color 0.2s, background 0.2s; margin-bottom: 1rem;
+        background: var(--panel);
+    }
+    .upload-zone:active { border-color: var(--ink); background: #f5f5f5; }
+    .upload-zone.loading { pointer-events: none; opacity: 0.6; }
+    .upload-zone input[type="file"] { display: none; }
+    .upload-icon { font-size: 2.2rem; margin-bottom: 0.6rem; opacity: 0.6; }
+    .upload-text { font-size: 0.95rem; color: var(--ink); margin-bottom: 0.2rem; }
+    .upload-hint { font-size: 0.75rem; color: var(--ink-dim); }
+
+    .images-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        gap: 0.5rem; margin-bottom: 1rem;
+    }
+    .image-card {
+        position: relative; border-radius: 8px; overflow: hidden;
+        border: 1px solid var(--border); background: #f0f0f0;
+        aspect-ratio: 9/16;
+    }
+    .image-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .image-card .remove-btn {
+        position: absolute; top: 4px; right: 4px;
+        background: rgba(0,0,0,0.65); color: #fff; border: none;
+        width: 22px; height: 22px; border-radius: 50%; font-size: 11px;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        line-height: 1;
+    }
+
+    textarea {
+        width: 100%; padding: 0.75rem 0.9rem; border-radius: 8px;
+        border: 1px solid var(--border); background: #fafafa;
+        color: var(--ink); font-family: inherit; font-size: 0.88rem;
+        min-height: 80px; resize: vertical;
+    }
+    textarea:focus { outline: none; border-color: var(--ink); }
+
+    .script-input {
+        width: 100%; padding: 1rem;
+        border-radius: 8px; border: 1px solid var(--border);
+        background: #fafafa; color: var(--ink);
+        font-family: inherit; font-size: 0.9rem;
+        min-height: 200px; resize: vertical; line-height: 1.6;
+    }
+    .script-input:focus { outline: none; border-color: var(--ink); }
+    .script-hint {
+        font-size: 0.72rem; color: var(--ink-dim);
+        margin-top: 0.5rem; line-height: 1.4;
+    }
+
+    .segments-preview {
+        background: var(--panel-2); border-radius: 8px;
+        padding: 0.8rem; margin-top: 0.8rem;
+        max-height: 300px; overflow-y: auto;
+    }
+    .segment-item {
+        padding: 0.6rem 0.8rem; border-radius: 6px;
+        background: var(--panel); border: 1px solid var(--border);
+        margin-bottom: 0.4rem; font-size: 0.8rem;
+    }
+    .segment-item .seg-num {
+        font-size: 0.65rem; color: var(--accent, var(--info));
+        text-transform: uppercase; letter-spacing: 0.08em;
+        margin-bottom: 0.2rem; font-weight: 600;
+    }
+    .segment-item .seg-text { color: var(--ink-dim); line-height: 1.4; }
+
+    .styles-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 0.5rem;
+    }
+    .style-card {
+        padding: 0.75rem 0.85rem; border-radius: 8px;
+        border: 1px solid var(--border); background: var(--panel-2);
+        cursor: pointer; transition: all 0.15s;
+        display: flex; align-items: center; gap: 0.5rem;
+    }
+    .style-card:active { transform: scale(0.98); }
+    .style-card.selected { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .style-card .style-emoji { font-size: 1.2rem; flex-shrink: 0; }
+    .style-card .style-name { font-size: 0.8rem; font-weight: 500; line-height: 1.2; }
+    .style-card .style-desc { font-size: 0.65rem; opacity: 0.65; margin-top: 0.1rem; line-height: 1.2; }
+
+    .control-row { margin-bottom: 0.9rem; }
+    .control-row:last-child { margin-bottom: 0; }
+    .control-label {
+        display: block; font-size: 0.72rem; color: var(--ink-dim);
+        margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.06em;
+        font-weight: 600;
+    }
+    select {
+        width: 100%; padding: 0.7rem 0.9rem; border-radius: 8px;
+        border: 1px solid var(--border); background: #fafafa;
+        color: var(--ink); font-family: inherit; font-size: 0.88rem;
+        -webkit-appearance: none; appearance: none;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%231a1a1a' d='M0 0l5 6 5-6z'/></svg>");
+        background-repeat: no-repeat;
+        background-position: right 0.9rem center;
+        background-size: 10px;
+    }
+    select:focus { outline: none; border-color: var(--ink); }
+
+    .btn-primary {
+        width: 100%; padding: 1.1rem; border-radius: var(--radius);
+        border: none; background: var(--ink); color: #fff;
+        font-size: 1rem; font-weight: 600; font-family: inherit;
+        cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+        margin-bottom: 1rem;
+    }
+    .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .btn-stop {
+        width: 100%; padding: 0.8rem; border-radius: var(--radius);
+        border: 1px solid var(--border); background: var(--panel);
+        color: var(--error); font-size: 0.85rem; font-weight: 600;
+        font-family: inherit; cursor: pointer; margin-bottom: 1rem;
+        display: none;
+    }
+    .btn-stop.visible { display: block; }
+
+    .queue { margin-top: 1rem; }
+    .queue-summary {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 0.6rem;
+        font-size: 0.78rem; display: flex; justify-content: space-between;
+        align-items: center; flex-wrap: wrap; gap: 0.4rem;
+    }
+    .queue-summary .progress-text { color: var(--ink); font-weight: 600; }
+    .queue-summary .eta-text { color: var(--ink-dim); }
+
+    .queue-item {
+        display: flex; align-items: center; gap: 0.8rem;
+        padding: 0.7rem 0.8rem; border-radius: 8px;
+        border: 1px solid var(--border); margin-bottom: 0.4rem;
+        background: var(--panel); transition: border-color 0.3s, opacity 0.3s;
+        font-size: 0.82rem;
+    }
+    .queue-item.pending { opacity: 0.5; }
+    .queue-item.creating { border-color: var(--warn); }
+    .queue-item.processing { border-color: var(--ink); }
+    .queue-item.done { border-color: var(--success); }
+    .queue-item.failed { border-color: var(--error); }
+    .queue-item .q-icon { font-size: 1rem; width: 1.5rem; text-align: center; flex-shrink: 0; }
+    .queue-item .q-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .queue-item .q-status { font-size: 0.72rem; color: var(--ink-dim); text-align: right; flex-shrink: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .gallery { margin-top: 1.5rem; }
+    .gallery-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 0.8rem;
+    }
+    .gallery-item {
+        border-radius: var(--radius); overflow: hidden;
+        border: 1px solid var(--border); background: #000;
+        animation: fadeIn 0.4s ease;
+    }
+    .gallery-item video { width: 100%; display: block; aspect-ratio: 16/9; object-fit: cover; }
+    .gallery-item .g-caption {
+        padding: 0.4rem 0.6rem; background: var(--panel);
+        font-size: 0.7rem; color: var(--ink-dim);
+    }
+
+    .status-bar {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        background: var(--ink); color: #fff; padding: 0.7rem 1rem;
+        font-size: 0.78rem; display: flex; align-items: center; gap: 0.6rem;
+        transform: translateY(100%); transition: transform 0.3s;
+        z-index: 100;
+    }
+    .status-bar.visible { transform: translateY(0); }
+    .status-bar .spinner {
+        width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: #fff; border-radius: 50%;
+        animation: spin 0.8s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .hidden { display: none !important; }
+    #noSleepCanvas { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; z-index: -1; }
+    #noSleepVideo { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; z-index: -1; }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>Atelier Formation</h1>
+    <p class="subtitle">Générez des vidéos pédagogiques à partir de votre script</p>
+</header>
+
+<div class="info-banner">
+    <strong>Comment ça marche :</strong> Collez votre script de formation. L'outil le découpe automatiquement
+    en segments de 5 à 12 secondes (environ 20 à 48 mots par segment), puis génère une vidéo pour chaque segment.
+    Chaque segment est une <strong>vidéo indépendante</strong> que vous pourrez assembler ensuite avec un outil de montage.
+</div>
+
+<div class="api-panel" id="api-panel">
+    <input type="password" class="api-key-input" id="api-key-input"
+           placeholder="Collez votre clé API ici (sk-...)" autocomplete="off" spellcheck="false">
+    <button type="button" class="api-save-btn" id="api-save-btn">Enregistrer la clé</button>
+    <div class="api-status-line" id="api-status-line">
+        <span class="status-dot"></span>
+        <span id="api-status-text">Aucune clé API enregistrée</span>
+    </div>
+    <div class="api-hint">
+        Clé gratuite sur <a href="https://platform.agnes-ai.com" target="_blank">platform.agnes-ai.com</a> → Settings → API Keys
+    </div>
+    <div class="stat-line" id="stat-line">
+        <span>📊 Vitesse moyenne : <span id="stat-speed">en attente de données</span></span>
+        <span id="stat-samples">0 génération</span>
+    </div>
+    <div class="wake-status" id="wake-status">
+        <span id="wake-status-text">💤 Veille automatique</span>
+        <button type="button" id="wake-toggle-btn">Garder l'écran allumé</button>
+    </div>
+</div>
+
+<div class="section open" id="section-script">
+    <div class="section-header" data-toggle="section-script">
+        <span class="section-title">📝 Votre script de formation</span>
+        <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+        <div class="section-content">
+            <textarea class="script-input" id="main-script"
+                placeholder="Collez ici le texte de votre formation. Par exemple :
+
+« Bienvenue dans cette formation sur la sécurité au travail. Aujourd'hui, nous allons voir les trois règles fondamentales à respecter dans tout environnement industriel.
+
+Première règle : le port des équipements de protection individuelle. Casque, gants, chaussures de sécurité et lunettes sont obligatoires à tout moment.
+
+Deuxième règle : l'identification des zones à risque. Chaque zone est signalée par un code couleur précis. Rouge pour danger immédiat, jaune pour attention, vert pour issue de secours.
+
+Troisième règle : la procédure d'urgence. En cas d'incident, coupez immédiatement l'alimentation, alertez le responsable de zone, et évacuez par l'issue la plus proche. »"></textarea>
+            <div class="script-hint">
+                💡 Le script sera découpé automatiquement en segments de 5 à 12 secondes.
+                Vous pouvez ajuster la durée cible ci-dessous. Chaque segment donnera une vidéo.
+            </div>
+            <div class="segments-preview" id="segments-preview" style="display:none;"></div>
+        </div>
+    </div>
+</div>
+
+<div class="section" id="section-style">
+    <div class="section-header" data-toggle="section-style">
+        <span class="section-title">🎨 Style visuel</span>
+        <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+        <div class="section-content">
+            <div class="styles-grid" id="styles-grid"></div>
+        </div>
+    </div>
+</div>
+
+<div class="section" id="section-tech">
+    <div class="section-header" data-toggle="section-tech">
+        <span class="section-title">⚙️ Réglages</span>
+        <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+        <div class="section-content">
+            <div class="control-row">
+                <label class="control-label">Durée cible par segment</label>
+                <select id="segment-duration-select">
+                    <option value="4">4 secondes (court)</option>
+                    <option value="5" selected>5 secondes (recommandé)</option>
+                    <option value="6">6 secondes</option>
+                    <option value="8">8 secondes</option>
+                    <option value="10">10 secondes</option>
+                    <option value="12">12 secondes (max)</option>
+                </select>
+            </div>
+            <div class="control-row">
+                <label class="control-label">Format de la vidéo</label>
+                <select id="aspect-select">
+                    <option value="16:9" selected>16:9 (paysage) — présentation classique</option>
+                    <option value="9:16">9:16 (portrait) — mobile</option>
+                    <option value="1:1">1:1 (carré) — réseaux sociaux</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<button type="button" class="btn-primary" id="generate-btn" disabled>
+    Générer les vidéos de formation
+</button>
+
+<button type="button" class="btn-stop" id="stop-btn">
+    ⏹ Arrêter la génération
+</button>
+
+<div class="queue" id="queue" style="display:none;"></div>
+
+<div class="gallery" id="gallery" style="display:none;">
+    <div class="section-title" style="margin-bottom:0.8rem;">Vidéos générées</div>
+    <div class="gallery-grid" id="gallery-grid"></div>
+</div>
+
+<div class="status-bar" id="status-bar">
+    <div class="spinner"></div>
+    <span id="status-text">Préparation…</span>
+</div>
+
+<div class="toast" id="toast">
+    <span class="toast-icon" id="toast-icon">✓</span>
+    <span id="toast-text">Message</span>
+</div>
+
+<canvas id="noSleepCanvas" width="2" height="2"></canvas>
+<video id="noSleepVideo" playsinline muted loop></video>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// CONFIGURATION
+// ══════════════════════════════════════════════════════════════════
+const API_BASE = 'https://apihub.agnes-ai.com/v1';
+const POLL_BASE = 'https://apihub.agnes-ai.com/agnesapi';
+const MODEL_VIDEO = 'agnes-video-2.5-flash';
+const SECONDS_PER_SEGMENT = 5; // durée cible par segment
+
+let createIntervalMs = 62000;
+const CREATE_INTERVAL_MIN = 62000;
+const CREATE_INTERVAL_MAX = 90000;
+
+const POLL_INTERVAL_SEC = 3;
+const MAX_POLL_ATTEMPTS = 120;
+
+const TIMING_CACHE_KEY = 'agnes_timing_cache_v11';
+const API_KEY_STORAGE = 'agnes_api_key';
+const WAKE_LOCK_PREF = 'agnes_wakelock_enabled';
+
+const MAX_VISIBLE_QUEUE = 30;
+
+// ══════════════════════════════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════════════════════════════
+let toastTimeout = null;
+function showToast(message, type = 'success', duration = 2500) {
+    const toast = document.getElementById('toast');
+    const icon = document.getElementById('toast-icon');
+    const text = document.getElementById('toast-text');
+    if (!toast || !icon || !text) return;
+
+    toast.classList.remove('visible', 'success', 'error', 'warn');
+    void toast.offsetWidth;
+
+    const icons = { success: '✓', error: '✕', warn: '⚠' };
+    icon.textContent = icons[type] || '✓';
+    text.textContent = message;
+    toast.classList.add(type);
+
+    requestAnimationFrame(() => toast.classList.add('visible'));
+
+    if (toastTimeout) clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => toast.classList.remove('visible'), duration);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ANTI-VEILLE
+// ══════════════════════════════════════════════════════════════════
+let wakeLockSentinel = null;
+let wakeLockEnabled = false;
+let canvasStream = null;
+let canvasInterval = null;
+
+function isWakeLockSupported() {
+    return 'wakeLock' in navigator && typeof navigator.wakeLock.request === 'function';
+}
+
+async function requestWakeLockAPI() {
+    if (!isWakeLockSupported()) return false;
+    try {
+        wakeLockSentinel = await navigator.wakeLock.request('screen');
+        wakeLockSentinel.addEventListener('release', () => { wakeLockSentinel = null; updateWakeStatus(); });
+        return true;
+    } catch (e) { return false; }
+}
+
+function startCanvasStream() {
+    if (canvasStream) return true;
+    try {
+        const canvas = document.getElementById('noSleepCanvas');
+        const video = document.getElementById('noSleepVideo');
+        if (!canvas || !video) return false;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return false;
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (typeof canvas.captureStream !== 'function') return false;
+        canvasStream = canvas.captureStream(1);
+        let toggle = false;
+        canvasInterval = setInterval(() => {
+            toggle = !toggle;
+            ctx.fillStyle = toggle ? '#000000' : '#010101';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }, 1000);
+        video.srcObject = canvasStream;
+        video.muted = true;
+        video.play().catch(() => {});
+        return true;
+    } catch (e) { return false; }
+}
+
+function stopCanvasStream() {
+    if (canvasInterval) { clearInterval(canvasInterval); canvasInterval = null; }
+    const video = document.getElementById('noSleepVideo');
+    if (video) { try { video.pause(); video.srcObject = null; } catch (e) {} }
+    if (canvasStream) { try { canvasStream.getTracks().forEach(t => t.stop()); } catch (e) {} canvasStream = null; }
+}
+
+async function activateWakeLock() {
+    if (isWakeLockSupported()) {
+        const ok = await requestWakeLockAPI();
+        if (ok) return true;
+    }
+    return startCanvasStream();
+}
+
+async function deactivateWakeLock() {
+    if (wakeLockSentinel) { try { await wakeLockSentinel.release(); } catch (e) {} wakeLockSentinel = null; }
+    stopCanvasStream();
+}
+
+function updateWakeStatus() {
+    const el = document.getElementById('wake-status');
+    const txt = document.getElementById('wake-status-text');
+    const btn = document.getElementById('wake-toggle-btn');
+    if (!el || !txt || !btn) return;
+    el.classList.remove('active', 'warn');
+    const isActive = wakeLockSentinel !== null || canvasStream !== null;
+    if (wakeLockEnabled && isActive) {
+        el.classList.add('active');
+        txt.textContent = '✅ L\'écran reste allumé';
+        btn.textContent = 'Désactiver';
+    } else if (wakeLockEnabled) {
+        el.classList.add('warn');
+        txt.textContent = '⏳ En attente (touchez la page)';
+        btn.textContent = 'Désactiver';
+    } else {
+        txt.textContent = '💤 Veille automatique';
+        btn.textContent = 'Garder l\'écran allumé';
+    }
+}
+
+async function toggleWakeLock() {
+    if (wakeLockEnabled) {
+        wakeLockEnabled = false;
+        await deactivateWakeLock();
+        try { localStorage.setItem(WAKE_LOCK_PREF, '0'); } catch (e) {}
+        showToast('Veille réactivée', 'warn');
+    } else {
+        wakeLockEnabled = true;
+        const ok = await activateWakeLock();
+        try { localStorage.setItem(WAKE_LOCK_PREF, '1'); } catch (e) {}
+        showToast(ok ? 'Écran maintenu allumé' : 'Activez dans les réglages', ok ? 'success' : 'warn');
+    }
+    updateWakeStatus();
+}
+
+document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && wakeLockEnabled) {
+        await activateWakeLock();
+        updateWakeStatus();
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// CACHE DES TEMPS
+// ══════════════════════════════════════════════════════════════════
+function loadTimingCache() {
+    try { return JSON.parse(localStorage.getItem(TIMING_CACHE_KEY) || '{}'); }
+    catch (e) { return {}; }
+}
+function saveTimingCache(cache) {
+    try { localStorage.setItem(TIMING_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+}
+function recordGenerationTime(seconds, durationMs) {
+    const cache = loadTimingCache();
+    const key = String(seconds);
+    if (!cache[key]) cache[key] = [];
+    cache[key].push(durationMs);
+    if (cache[key].length > 10) cache[key] = cache[key].slice(-10);
+    saveTimingCache(cache);
+    updateTimingDisplay();
+}
+function estimateGenerationTime(seconds) {
+    const cache = loadTimingCache();
+    const samples = cache[String(seconds)];
+    if (samples && samples.length > 0) {
+        const sorted = [...samples].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 === 0 ? (sorted[mid-1] + sorted[mid]) / 2 : sorted[mid];
+    }
+    return 20000 + seconds * 4000;
+}
+function updateTimingDisplay() {
+    const cache = loadTimingCache();
+    const all = Object.values(cache).flat();
+    const speedEl = document.getElementById('stat-speed');
+    const samplesEl = document.getElementById('stat-samples');
+    if (!speedEl || !samplesEl) return;
+    if (all.length === 0) { speedEl.textContent = 'en attente'; samplesEl.textContent = '0 génération'; return; }
+    const avg = all.reduce((a, b) => a + b, 0) / all.length;
+    speedEl.textContent = (avg / 1000).toFixed(1) + ' s en moyenne';
+    samplesEl.textContent = all.length + ' génération' + (all.length > 1 ? 's' : '');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// STYLES PÉDAGOGIQUES
+// ══════════════════════════════════════════════════════════════════
+const VISUAL_STYLES = [
+    { id: 'whiteboard', name: 'Tableau blanc', emoji: '📋', desc: 'Schéma animé, style pédagogique',
+      prompt: 'Clean educational whiteboard animation style, hand-drawn diagrams appearing progressively, clear arrows and labels, professional pedagogical presentation, soft neutral background, minimalist and readable' },
+    { id: 'corporate', name: 'Corporate moderne', emoji: '🏢', desc: 'Présentation pro, bleu et gris',
+      prompt: 'Modern corporate presentation style, soft blue and grey tones, clean minimalist layout, professional business aesthetic, subtle gradients, clear visual hierarchy, suitable for training and education' },
+    { id: 'infographic', name: 'Infographie animée', emoji: '📊', desc: 'Données visuelles, icônes',
+      prompt: 'Infographic animation style, data visualization elements, icons and pictograms appearing, clean flat design, pedagogical clarity, visual hierarchy, suitable for explaining concepts step by step' },
+    { id: 'documentary', name: 'Documentaire', emoji: '🎥', desc: 'Images réelles, sérieux',
+      prompt: 'Documentary style, realistic footage, natural lighting, professional interview framing, serious and trustworthy tone, suitable for corporate training, clear and informative' },
+    { id: 'minimal', name: 'Minimaliste', emoji: '⬜', desc: 'Épuré, focus sur le message',
+      prompt: 'Ultra minimalist style, white background, single subject or concept per scene, clean typography space, no visual distractions, focus on clarity and comprehension, pedagogical efficiency' },
+    { id: 'futuristic', name: 'Futuriste', emoji: '🚀', desc: 'Tech, innovation, bleu néon',
+      prompt: 'Futuristic tech presentation style, dark background with blue and cyan accents, clean digital interface elements, innovative and modern feel, suitable for technology training, professional and cutting-edge' }
+];
+
+// ══════════════════════════════════════════════════════════════════
+// ÉTAT GLOBAL
+// ══════════════════════════════════════════════════════════════════
+const state = {
+    isRunning: false,
+    stopRequested: false,
+    queue: [],
+    completed: 0,
+    failed: 0,
+    selectedStyle: 'whiteboard',
+    scriptText: '',
+    segments: [],
+    segmentSeconds: 5,
+    aspectRatio: '16:9',
+    creationAttemptsSinceLastError: 0
+};
+
+// ══════════════════════════════════════════════════════════════════
+// CLÉ API
+// ══════════════════════════════════════════════════════════════════
+function getApiKey() {
+    try { return (localStorage.getItem(API_KEY_STORAGE) || '').trim(); }
+    catch (e) { return ''; }
+}
+
+function saveApiKey() {
+    const input = document.getElementById('api-key-input');
+    if (!input) return;
+    const key = input.value.trim();
+    if (!key) {
+        try { localStorage.removeItem(API_KEY_STORAGE); } catch (e) {}
+        updateApiPanel();
+        showToast('Clé supprimée', 'warn');
+        return;
+    }
+    if (!key.startsWith('sk-') && !confirm('La clé ne commence pas par "sk-". Sauvegarder quand même ?')) return;
+    try {
+        localStorage.setItem(API_KEY_STORAGE, key);
+        updateApiPanel();
+        showToast('Clé API enregistrée ✓', 'success');
+        input.blur();
+    } catch (e) { showToast('Erreur de sauvegarde', 'error'); }
+}
+
+function updateApiPanel() {
+    const panel = document.getElementById('api-panel');
+    const input = document.getElementById('api-key-input');
+    const statusLine = document.getElementById('api-status-line');
+    const statusText = document.getElementById('api-status-text');
+    const key = getApiKey();
+    if (!panel || !input || !statusLine || !statusText) return;
+    if (key) {
+        panel.classList.add('ok');
+        statusLine.classList.add('ok');
+        statusText.textContent = 'Clé API active · ' + key.slice(0, 8) + '…' + key.slice(-4);
+        input.value = key;
+        input.placeholder = '';
+    } else {
+        panel.classList.remove('ok');
+        statusLine.classList.remove('ok');
+        statusText.textContent = 'Aucune clé API enregistrée';
+        input.value = '';
+        input.placeholder = 'Collez votre clé API ici (sk-...)';
+    }
+    updateGenerateBtn();
+}
+
+function updateGenerateBtn() {
+    const btn = document.getElementById('generate-btn');
+    if (!btn) return;
+    const hasScript = state.scriptText.trim().length > 0;
+    const hasKey = !!getApiKey();
+    btn.disabled = !hasScript || !hasKey || state.isRunning;
+
+    if (state.isRunning) {
+        const total = state.queue.length;
+        const done = state.completed + state.failed;
+        btn.textContent = 'Génération en cours… (' + done + '/' + total + ')';
+    } else if (!hasKey) {
+        btn.textContent = 'Ajoutez votre clé API';
+    } else if (!hasScript) {
+        btn.textContent = 'Collez votre script de formation';
+    } else {
+        btn.textContent = 'Générer les vidéos de formation (' + state.segments.length + ' segments)';
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// UTILITAIRES
+// ══════════════════════════════════════════════════════════════════
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function log(msg) { console.log('[Formation] ' + msg); }
+function setStatus(text) {
+    const bar = document.getElementById('status-bar');
+    const txt = document.getElementById('status-text');
+    if (!bar || !txt) return;
+    if (text) { bar.classList.add('visible'); txt.textContent = text; }
+    else bar.classList.remove('visible');
+}
+function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+}
+function formatEta(seconds) {
+    if (seconds < 60) return Math.round(seconds) + 's';
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    return m + 'm' + (s > 0 ? ' ' + s + 's' : '');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DÉCOUPAGE DU SCRIPT EN SEGMENTS
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * Découpe un script en segments de durée cible.
+ * On estime ~12-15 caractères par seconde de parole (débit modéré).
+ * Pour 5s, cela fait ~60-75 caractères par segment.
+ * On respecte les frontières de phrases quand c'est possible.
+ */
+function splitScriptIntoSegments(script, targetSeconds) {
+    const text = script.trim();
+    if (!text) return [];
+
+    // Estimation : ~13 caractères par seconde de parole
+    const charsPerSegment = Math.round(targetSeconds * 13);
+
+    // Découper en phrases (ponctuation forte)
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+
+    const segments = [];
+    let current = '';
+
+    for (const sentence of sentences) {
+        const trimmed = sentence.trim();
+        if (!trimmed) continue;
+
+        // Si la phrase seule dépasse la taille cible, on la coupe par mots
+        if (trimmed.length > charsPerSegment * 1.5) {
+            if (current) { segments.push(current.trim()); current = ''; }
+            const words = trimmed.split(/\s+/);
+            let chunk = '';
+            for (const word of words) {
+                if ((chunk + ' ' + word).trim().length > charsPerSegment && chunk) {
+                    segments.push(chunk.trim());
+                    chunk = word;
+                } else {
+                    chunk = chunk ? chunk + ' ' + word : word;
+                }
+            }
+            if (chunk.trim()) segments.push(chunk.trim());
+            continue;
+        }
+
+        // Sinon, on ajoute à la phrase courante
+        if ((current + ' ' + trimmed).trim().length > charsPerSegment && current) {
+            segments.push(current.trim());
+            current = trimmed;
+        } else {
+            current = current ? current + ' ' + trimmed : trimmed;
+        }
+    }
+
+    if (current.trim()) segments.push(current.trim());
+
+    return segments;
+}
+
+function updateSegmentsPreview() {
+    const preview = document.getElementById('segments-preview');
+    if (!preview) return;
+
+    if (!state.segments.length) {
+        preview.style.display = 'none';
+        return;
+    }
+
+    preview.style.display = 'block';
+    preview.innerHTML = state.segments.map((seg, i) => {
+        const estimatedSec = Math.round(seg.length / 13);
+        return '<div class="segment-item">' +
+            '<div class="seg-num">Segment ' + (i + 1) + ' · ~' + estimatedSec + 's</div>' +
+            '<div class="seg-text">' + esc(seg.slice(0, 120)) + (seg.length > 120 ? '…' : '') + '</div>' +
+        '</div>';
+    }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RENDU DES STYLES
+// ══════════════════════════════════════════════════════════════════
+function renderStyles() {
+    const container = document.getElementById('styles-grid');
+    if (!container) return;
+
+    container.innerHTML = VISUAL_STYLES.map(s => {
+        return '<div class="style-card ' + (state.selectedStyle === s.id ? 'selected' : '') + '" data-style="' + s.id + '">' +
+            '<div class="style-emoji">' + s.emoji + '</div>' +
+            '<div>' +
+                '<div class="style-name">' + esc(s.name) + '</div>' +
+                '<div class="style-desc">' + esc(s.desc) + '</div>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+
+    container.querySelectorAll('[data-style]').forEach(el => {
+        el.addEventListener('click', () => {
+            state.selectedStyle = el.dataset.style;
+            renderStyles();
+        });
+    });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CONSTRUCTION DU PROMPT POUR UN SEGMENT
+// ══════════════════════════════════════════════════════════════════
+function buildSegmentPrompt(segmentText) {
+    const style = VISUAL_STYLES.find(s => s.id === state.selectedStyle) || VISUAL_STYLES[0];
+
+    // Nettoyer le texte pour l'utiliser dans le prompt
+    const cleanText = segmentText.replace(/[«»"""]/g, '"').slice(0, 400);
+
+    return [
+        style.prompt,
+        'The video should visually illustrate the following training content: "' + cleanText + '"',
+        'Professional educational video, clear and informative, suitable for corporate training.',
+        'No text overlays, no subtitles, no watermarks, no music.',
+        'Smooth camera movement, professional lighting, high production value.',
+        'Duration: ' + state.segmentSeconds + ' seconds.',
+        'Aspect ratio: ' + state.aspectRatio + '.'
+    ].join(' ');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// API AGNES
+// ══════════════════════════════════════════════════════════════════
+async function apiFetch(url, options = {}, label = 'API') {
+    for (let attempt = 0; attempt < 7; attempt++) {
+        if (state.stopRequested) throw new Error('Arrêt demandé');
+        try {
+            const res = await fetch(url, options);
+            if (res.status === 429) {
+                state.creationAttemptsSinceLastError = 0;
+                const wait = [15, 30, 45, 60, 90, 120, 180][Math.min(attempt, 6)];
+                log(label + ' : 429, attente ' + wait + 's');
+                setStatus('L\'intelligence artificielle se prépare… (' + wait + 's)');
+                await sleep(wait * 1000);
+                continue;
+            }
+            if (res.status === 503) {
+                const wait = [5, 10, 15, 20, 30, 45][Math.min(attempt, 5)];
+                log(label + ' : 503, attente ' + wait + 's');
+                setStatus('Votre vidéo se prépare… (' + wait + 's)');
+                await sleep(wait * 1000);
+                continue;
+            }
+            return res;
+        } catch (e) {
+            if (e.message === 'Arrêt demandé') throw e;
+            const wait = [3, 5, 8, 12, 20, 30][Math.min(attempt, 5)];
+            log(label + ' : réseau, retry ' + wait + 's');
+            setStatus('Connexion en cours… (' + wait + 's)');
+            await sleep(wait * 1000);
+        }
+    }
+    return fetch(url, options);
+}
+
+async function createVideoTask(prompt) {
+    const body = {
+        model: MODEL_VIDEO,
+        prompt: prompt,
+        seconds: String(state.segmentSeconds),
+        mode: 'text',
+        size: '720P',
+        aspect_ratio: state.aspectRatio
+    };
+
+    const res = await apiFetch(API_BASE + '/videos', {
+        method: 'POST',
+        headers: {
+            'Authorization': 'Bearer ' + getApiKey(),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    }, 'Création');
+
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error('HTTP ' + res.status + ' — ' + err.slice(0, 200));
+    }
+
+    const data = await res.json();
+    const videoId = data.video_id || data.id || data.task_id;
+    if (!videoId) throw new Error('Pas de video_id retourné');
+    return videoId;
+}
+
+async function pollVideo(videoId, onProgress) {
+    const estimatedMs = estimateGenerationTime(state.segmentSeconds);
+    const estimatedSec = estimatedMs / 1000;
+
+    let remaining = Math.max(10, Math.floor(estimatedSec * 0.7));
+    while (remaining > 0) {
+        if (state.stopRequested) throw new Error('Arrêt demandé');
+        onProgress('Votre vidéo se prépare… — ' + remaining + 's');
+        await sleep(1000);
+        remaining--;
+    }
+
+    for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+        if (state.stopRequested) throw new Error('Arrêt demandé');
+        if (attempt > 0) {
+            let r = POLL_INTERVAL_SEC;
+            while (r > 0) {
+                if (state.stopRequested) throw new Error('Arrêt demandé');
+                onProgress('L\'image prend vie… — ' + r + 's');
+                await sleep(1000);
+                r--;
+            }
+        }
+
+        const url = POLL_BASE + '?video_id=' + encodeURIComponent(videoId) + '&model_name=' + encodeURIComponent(MODEL_VIDEO);
+        const res = await apiFetch(url, {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + getApiKey() }
+        }, 'Polling');
+
+        const d = await res.json();
+        const status = d.status || 'unknown';
+        const progress = d.progress || 0;
+        onProgress('Création en cours… — ' + progress + '%');
+
+        if (status === 'completed' || status === 'succeeded' || status === 'done') {
+            const videoUrl = (d.metadata && d.metadata.url) || d.url || (d.output && d.output.url);
+            if (!videoUrl) throw new Error('Terminé mais pas d\'URL');
+            return videoUrl;
+        }
+        if (status === 'failed' || status === 'error' || status === 'cancelled') {
+            throw new Error('Échec (' + status + ')');
+        }
+    }
+    throw new Error('Délai maximal dépassé');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FILE D'ATTENTE
+// ══════════════════════════════════════════════════════════════════
+function renderQueue() {
+    const queueEl = document.getElementById('queue');
+    if (!queueEl) return;
+    if (!state.queue.length) { queueEl.style.display = 'none'; return; }
+    queueEl.style.display = 'block';
+
+    const total = state.queue.length;
+    const done = state.completed + state.failed;
+    const inProgress = state.queue.filter(q => q.status === 'processing').length;
+    const pending = total - done - inProgress;
+
+    const estGen = estimateGenerationTime(state.segmentSeconds) / 1000;
+    const eta = pending > 0 ? (pending * (createIntervalMs / 1000)) + estGen : estGen;
+
+    let html = '<div class="queue-summary">' +
+        '<span class="progress-text">Progression : ' + done + '/' + total + '</span>' +
+        '<span class="eta-text">' + (done < total ? '≈ ' + formatEta(eta) + ' restant' : 'Terminé') + '</span>' +
+        '</div>';
+
+    const visible = state.queue.slice(0, MAX_VISIBLE_QUEUE);
+    html += visible.map(item => {
+        let icon = '○', statusText = 'En attente', cls = 'pending';
+        if (item.status === 'creating') { icon = '◐'; statusText = 'Préparation…'; cls = 'creating'; }
+        else if (item.status === 'processing') { icon = '◐'; statusText = item.progress || 'En cours…'; cls = 'processing'; }
+        else if (item.status === 'done') { icon = '●'; statusText = 'Terminé'; cls = 'done'; }
+        else if (item.status === 'failed') { icon = '✕'; statusText = 'Échec'; cls = 'failed'; }
+        return '<div class="queue-item ' + cls + '">' +
+            '<div class="q-icon">' + icon + '</div>' +
+            '<div class="q-name">Segment ' + (item.index + 1) + '</div>' +
+            '<div class="q-status">' + esc(statusText) + '</div>' +
+        '</div>';
+    }).join('');
+
+    if (state.queue.length > MAX_VISIBLE_QUEUE) {
+        html += '<div class="queue-more">… et ' + (state.queue.length - MAX_VISIBLE_QUEUE) + ' autres segments</div>';
+    }
+
+    queueEl.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GALERIE
+// ══════════════════════════════════════════════════════════════════
+function addToGallery(videoUrl, label) {
+    const galleryEl = document.getElementById('gallery');
+    const galleryGrid = document.getElementById('gallery-grid');
+    galleryEl.style.display = 'block';
+    const el = document.createElement('div');
+    el.className = 'gallery-item';
+    el.innerHTML = '<video controls preload="metadata" muted playsinline>' +
+        '<source src="' + videoUrl + '" type="video/mp4">' +
+        '</video>' +
+        '<div class="g-caption">' + esc(label) + '</div>';
+    galleryGrid.appendChild(el);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PIPELINE
+// ══════════════════════════════════════════════════════════════════
+async function createSegmentTask(item) {
+    item.status = 'creating';
+    item.progress = 'Préparation…';
+    renderQueue();
+
+    const prompt = buildSegmentPrompt(item.text);
+    item.prompt = prompt;
+    log('[Segment ' + (item.index + 1) + '] Création…');
+    const videoId = await createVideoTask(prompt);
+    item.videoId = videoId;
+    item.startTime = Date.now();
+    item.status = 'processing';
+    item.progress = 'En cours…';
+    renderQueue();
+    log('[Segment ' + (item.index + 1) + '] Tâche créée : ' + String(videoId).slice(0, 30) + '…');
+    return videoId;
+}
+
+async function pollSegmentAndDisplay(item) {
+    try {
+        const videoUrl = await pollVideo(item.videoId, (prog) => {
+            item.progress = prog;
+            renderQueue();
+        });
+
+        const elapsed = Date.now() - item.startTime;
+        recordGenerationTime(state.segmentSeconds, elapsed);
+        log('[Segment ' + (item.index + 1) + '] Terminé en ' + (elapsed / 1000).toFixed(1) + 's');
+
+        item.status = 'done';
+        item.videoUrl = videoUrl;
+        item.progress = 'Terminé';
+        state.completed++;
+        renderQueue();
+        updateGenerateBtn();
+        addToGallery(videoUrl, 'Segment ' + (item.index + 1));
+    } catch (e) {
+        if (e.message === 'Arrêt demandé') {
+            item.status = 'failed';
+            item.progress = 'Arrêté';
+        } else {
+            log('[Segment ' + (item.index + 1) + '] ' + e.message);
+            item.status = 'failed';
+            item.progress = 'Échec';
+            state.failed++;
+        }
+        renderQueue();
+        updateGenerateBtn();
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// WORKFLOW PRINCIPAL
+// ══════════════════════════════════════════════════════════════════
+async function startGeneration() {
+    if (state.isRunning || !state.segments.length) return;
+    if (!getApiKey()) {
+        showToast('Ajoutez d\'abord votre clé API', 'error');
+        document.getElementById('api-key-input').focus();
+        return;
+    }
+
+    state.isRunning = true;
+    state.stopRequested = false;
+    state.completed = 0;
+    state.failed = 0;
+    state.creationAttemptsSinceLastError = 0;
+
+    state.queue = state.segments.map((text, i) => ({
+        index: i,
+        text: text,
+        status: 'pending',
+        progress: null,
+        videoId: null,
+        videoUrl: null,
+        prompt: null,
+        startTime: null
+    }));
+
+    document.getElementById('gallery-grid').innerHTML = '';
+    document.getElementById('gallery').style.display = 'none';
+    document.getElementById('stop-btn').classList.add('visible');
+    document.getElementById('generate-btn').disabled = true;
+
+    if (wakeLockEnabled) await activateWakeLock();
+
+    renderQueue();
+    updateGenerateBtn();
+
+    log('Démarrage — ' + state.segments.length + ' segments');
+    log('Style : ' + state.selectedStyle);
+    log('Durée par segment : ' + state.segmentSeconds + 's');
+
+    const totalStart = Date.now();
+    const pollingTasks = [];
+
+    try {
+        for (let i = 0; i < state.queue.length; i++) {
+            if (state.stopRequested) break;
+            const item = state.queue[i];
+            try {
+                await createSegmentTask(item);
+                pollingTasks.push(pollSegmentAndDisplay(item));
+            } catch (e) {
+                if (e.message === 'Arrêt demandé') break;
+                log('[Segment ' + (i + 1) + '] Échec création : ' + e.message);
+                item.status = 'failed';
+                item.progress = 'Échec';
+                state.failed++;
+                renderQueue();
+                updateGenerateBtn();
+            }
+
+            if (i < state.queue.length - 1 && !state.stopRequested) {
+                const waitSec = Math.ceil(createIntervalMs / 1000);
+                for (let r = waitSec; r > 0; r--) {
+                    if (state.stopRequested) break;
+                    setStatus('Respiration créative… — Segment ' + (i + 2) + '/' + state.queue.length + ' dans ' + r + 's');
+                    await sleep(1000);
+                }
+            }
+        }
+
+        if (pollingTasks.length > 0) {
+            setStatus('Finalisation…');
+            await Promise.allSettled(pollingTasks);
+        }
+    } catch (e) {
+        log('Erreur globale : ' + e.message);
+    }
+
+    const totalElapsed = (Date.now() - totalStart) / 1000;
+    const summary = state.stopRequested
+        ? 'Arrêté — ' + state.completed + '/' + state.queue.length + ' segments'
+        : '✦ ' + state.completed + '/' + state.queue.length + ' segments créés en ' + formatEta(totalElapsed) + ' ✦';
+
+    log(summary);
+    setStatus(summary);
+    await sleep(4000);
+    setStatus(null);
+
+    state.isRunning = false;
+    state.stopRequested = false;
+    document.getElementById('stop-btn').classList.remove('visible');
+    updateGenerateBtn();
+    showToast(state.completed + ' segment' + (state.completed > 1 ? 's' : '') + ' généré' + (state.completed > 1 ? 's' : ''), 'success');
+}
+
+function stopGeneration() {
+    if (!state.isRunning) return;
+    state.stopRequested = true;
+    log('Arrêt demandé');
+    setStatus('Arrêt en cours…');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// INITIALISATION
+// ══════════════════════════════════════════════════════════════════
+(function init() {
+    document.getElementById('api-save-btn').addEventListener('click', saveApiKey);
+
+    document.getElementById('stop-btn').addEventListener('click', stopGeneration);
+
+    const apiInput = document.getElementById('api-key-input');
+    apiInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); saveApiKey(); }
+    });
+
+    document.querySelectorAll('[data-toggle]').forEach(header => {
+        header.addEventListener('click', () => {
+            document.getElementById(header.dataset.toggle).classList.toggle('open');
+        });
+    });
+
+    // Script
+    const scriptInput = document.getElementById('main-script');
+    scriptInput.addEventListener('input', (e) => {
+        state.scriptText = e.target.value;
+        state.segments = splitScriptIntoSegments(state.scriptText, state.segmentSeconds);
+        updateSegmentsPreview();
+        updateGenerateBtn();
+    });
+
+    // Durée des segments
+    document.getElementById('segment-duration-select').addEventListener('change', (e) => {
+        state.segmentSeconds = parseInt(e.target.value, 10);
+        state.segments = splitScriptIntoSegments(state.scriptText, state.segmentSeconds);
+        updateSegmentsPreview();
+        updateGenerateBtn();
+    });
+
+    // Format
+    document.getElementById('aspect-select').addEventListener('change', (e) => {
+        state.aspectRatio = e.target.value;
+    });
+
+    // Générer
+    document.getElementById('generate-btn').addEventListener('click', startGeneration);
+
+    // Wake lock
+    document.getElementById('wake-toggle-btn').addEventListener('click', toggleWakeLock);
+
+    try {
+        const saved = localStorage.getItem(WAKE_LOCK_PREF);
+        wakeLockEnabled = saved === '1';
+    } catch (e) {}
+    if (wakeLockEnabled) activateWakeLock().then(updateWakeStatus);
+
+    // Rendu initial
+    updateApiPanel();
+    updateTimingDisplay();
+    updateWakeStatus();
+    renderStyles();
+    renderQueue();
+
+    log('Prêt.');
+})();
+</script>
+
+</body>
+  </html>
